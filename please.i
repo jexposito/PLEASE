@@ -19,6 +19,8 @@ func psf_please(cee, extra)
 	otf				= correlate(pupil, pupil).re;
 	dphi			= pupil * 0.;
 	
+	cee	*= extra.normModes;
+	Mi	/= sqrt(extra.normModes);		// Mi . Mi = extra.normModes
 	
 	/*	Uij	*/
 	/*for (i=1 ; i<=nmodes ; ++i) {
@@ -42,7 +44,6 @@ func psf_please(cee, extra)
 		uij		= calc_Uij(Mi(.., i), Mi(.., i), pupil);
 		dphi	+= cee(i, i) * uij;
 	}*/
-	
 	
 	
 	/*	Reconstruction of the structure function of the phase using Vij algorithm	*/
@@ -72,9 +73,9 @@ func psf_please(cee, extra)
 	write, "\n";
 	
 	/*	Reconstruction of the OTF	*/
-	
+
 	fact					= (2 * pi / lambdaim)^2;						// conversion lambda_measurements to lambda_images
-	tmp						= exp(-0.5 * dphi * fact / 1.42);
+	tmp						= exp(-0.5 * dphi * fact);
 	
 	/*	Support definition	*/
 	mask					= otf > max(otf) * 1.e-7;
@@ -191,6 +192,7 @@ func test_please(void)
 	normfact	= diag(m(+, ) * m(+, ))(avg);
 	
 	
+	/*		*/
 	extra.cor		= &(cross);
 	extra.var_ortho	= &(var_ortho);
 	extra.cww		= &(cbmes(, +) * cbmes(, +) / loop.niter);
@@ -219,7 +221,7 @@ func test_please(void)
 	write, "r0 = ", extra.teldiam / tmp(0);
 	write, "";
 	
-	
+	cee	= cor2cov(tmp,extra);
 	psf	= psf_please(cee, extra);
 	
 	return;	
