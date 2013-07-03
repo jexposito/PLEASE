@@ -5,7 +5,7 @@
  *
 */
 
-require,"iterkolmo.i";
+require, "iterkolmo.i";
 
 func mult_wfs(iter, disp=)
 /* DOCUMENT func mult_wfs(iter, disp=)
@@ -42,7 +42,7 @@ func mult_wfs(iter, disp=)
 
 		phase_3			= phase;
 		phase_3			-= phase_3(pix)(avg);
-		
+				
 		mircube			*= 0.0f;
 		mircube(, , ns)	= mircube2(, , ns);
 		phase_3			+= get_phase2d_from_dms(ns, "wfs");				// remove DM phase
@@ -53,9 +53,9 @@ func mult_wfs(iter, disp=)
 		
 
 		// Noise free measurements
-		nsave	= wfs(ns).noise;
-		
+		nsave			= wfs(ns).noise;
 		wfs(ns).noise	= 0;
+		
 		if (wfs(ns).type == "hartmann" ) {
 			tmpmes_all	= sh_wfs(ipupil, phase_3 * ipupil, ns);
 		}
@@ -68,11 +68,12 @@ func mult_wfs(iter, disp=)
 		grow, smes_nonoise, tmpmes_all;			
 
 		wfs(ns).noise	= nsave;
+		
 		//////////////////
 		//	END OF HACK	//
 		//////////////////
 		
-		smes			= sh_wfs(ipupil, phase_3 * ipupil, ns);
+		smes	= sh_wfs(ipupil, phase_3 * ipupil, ns);
 
 		// Subtract the reference vector for this sensor:
 		if (wfs(ns)._cyclecounter == 1) {

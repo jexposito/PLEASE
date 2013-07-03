@@ -7,12 +7,15 @@ struct extra_struct
 	pointer iMat;		// Interaction matrix for an "infinite" basis of modes 
 	pointer modes;		// 3D matrix containing the modes used to do the iMat
 	pointer cbact;		// Circular buffer of the coefficient of the modes
-	pointer ipupil;		// pupil
+	pointer ipupil;		// Pupil
 	pointer	imav;		// PSF to obtain
-	int		nact;		// number of corrected modes
+	pointer	alias		// Aliased modes in the DM space
+	pointer	Dphi_ortho;	// Structure function of the orthogonal phase
+	int		nact;		// Number of corrected modes
 	float	normJ;		// Normalization factor for the criterion
 	float	normModes;	// In case of the modes basis is not normalized to 1  i.e. (Mi . Mi) != 1
 	float	teldiam;	// Telescope diameter
+	float	cobs;		// Central obstruction in fraction of tel diam
 	int		niter;		// Number of iteration
 	float	lambdawfs;	// Wavelength of the WFS in micron
 	float	lambdaim;	// Wavelength of the observation in micron
@@ -82,6 +85,30 @@ func calc_Viif(ftMode1, ftMode2, mode1, mode2, den, conjftpup)
 	return Vii;
 }
 
+func calc_dphif(phase, pup, den, conjftpup)
+/* DOCUMENT 
+
+	Compute the structure function of the phase
+ 
+*/ 
+{
+	phase	= phase(:pupd, :pupd);
+	pup		= pup(:pupd, :pupd);
+	
+	npix	= dimsof(phase)(2);
+	mi		= p = dphi = array(float, [2, 2 * npix, 2 * npix]);
+	
+	mi(1:npix, 1:npix)	= phase;
+	p(1:npix, 1:npix)	= pup;
+	
+	mask	= den > max(den) * 1.e-7;
+	pix		= where(mask);
+	
+    dphi(pix)	= fft(fft(mi^2 * p, 1) * conjftpup + fft(p, 1) * conj(fft(mi^2 * p, 1)) - \
+					2. * fft(mi * p, 1) * conj(fft(mi * p, 1)), -1).re(pix) / den(pix);
+
+	return dphi;
+}
 
 
 

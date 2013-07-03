@@ -83,7 +83,7 @@ gs.zenithangle	= 0.;
 
 loop.gain			= 0.3;
 loop.framedelay		= 0;
-loop.niter			= 10000;
+loop.niter			= 500;
 loop.ittime			= 1. / 150.;
 loop.startskip		= 10;
 loop.skipevery		= 10000;
