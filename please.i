@@ -52,12 +52,12 @@ func psf_please(cee, extra, MC=)
 	l = SVdec(cee, u, vt, full=1);	// reconstruction: cee = (u(,+) * diag(l)(+,))(,+) * vt(+,)
 	
 	write, "\nVii computation\n";
-	vii		= Mi(, , +) * vt(, +);	// 
-	ftmi	= complex(vii * 0.);	//
+	Mii		= Mi(, , +) * vt(, +);	// diagonalisation
+	ftmi	= complex(Mii * 0.);	//
 	
 	/*	Computation of the FFT of the modes	for fast computing */
 	for (i=1 ; i<=nmodes ; i++) {
-		ftmi(, , i)	= fft(vii(, , i), 1);
+		ftmi(, , i)	= fft(Mii(, , i), 1);
 		write, format=" \rComputing FFT of mode %d", i;
 	}	
 	write, "";
@@ -65,11 +65,11 @@ func psf_please(cee, extra, MC=)
 	/*	Vii computation and structure function computation	*/
 	for (i=1 ; i<=nmodes ; i++) {
 		write, format=" \rComputing V%d%d mode", i;
-		modei	= vii(..,i);
+		modei	= Mii(..,i);
 		
-		tmp		= calc_Viif(ftmi(, , i), ftmi(, , i), modei, modei, otf, conj(fft(ipupil)));
+		vii		= calc_Viif(ftmi(, , i), ftmi(, , i), modei, modei, otf, conj(fft(ipupil)));
 		
-		dphi	+= tmp * l(i);
+		dphi	+= l(i) * vii;
 	}
 	write, "\n";
 	
@@ -79,12 +79,12 @@ func psf_please(cee, extra, MC=)
 		l		= SVdec(cee_mc, u, vt, full=1);	// reconstruction: cee = (u(,+) * diag(l)(+,))(,+) * vt(+,)
 		
 		write, "\nVii computation for MC method\n";
-		vii		= Mi(, , :extra.nact)(, , +) * vt(,+);	// 
-		ftmi	= complex(vii * 0.);	//
+		Mii		= Mi(, , :extra.nact)(, , +) * vt(,+);	// 
+		ftmi	= complex(Mii * 0.);	//
 		
 		/*	Computation of the FFT of the modes	for fast computing */
 		for (i=1 ; i<=extra.nact ; i++) {
-			ftmi(, , i)	= fft(vii(, , i), 1);
+			ftmi(, , i)	= fft(Mii(, , i), 1);
 			write, format=" \rComputing FFT of mode %d", i;
 		}	
 		write, "";
@@ -93,11 +93,11 @@ func psf_please(cee, extra, MC=)
 		/*	Vii computation and structure function computation	*/
 		for (i=1 ; i<=extra.nact ; i++) {
 			write, format=" \rComputing V%d%d mode for MC method", i;
-			modei	= vii(..,i);
 			
-			tmp		= calc_Viif(ftmi(, , i), ftmi(, , i), modei, modei, otf, conj(fft(ipupil)));
-			
-			dphi_mc	+= tmp * l(i);
+			modei	= Mii(..,i);
+			vii		= calc_Viif(ftmi(, , i), ftmi(, , i), modei, modei, otf, conj(fft(ipupil)));
+
+			dphi_mc	+= l(i) * vii;
 		}
 		write, "\n";
 	}
@@ -112,26 +112,26 @@ func psf_please(cee, extra, MC=)
 	mask					= 1 - mask;
 	tmp(where(mask))		= 0.;	
 	sz						= dimsof(tmp)(2);
-	fto_turb				= array(float, [2, 512, 512]);
-	fto_turb(1:sz, 1:sz)	= eclat(tmp);
+	otf_turb				= array(float, [2, 512, 512]);
+	otf_turb(1:sz, 1:sz)	= eclat(tmp);
 	
-	fto_turb				= eclat(roll(fto_turb, [512 / 2 - sz / 2, 512 / 2 - sz / 2]));
+	otf_turb				= eclat(roll(otf_turb, [512 / 2 - sz / 2, 512 / 2 - sz / 2]));
 		
 	/*	Various PSF : Telescope / on sky	*/
-	fto_tel				= telfto(lambdaim, 0.01, extra.teldiam, extra.cobs, lambdaim / extra.teldiam / 4.85 / (float(sim._size) / sim.pupildiam), sim._size) // just for Canary/WHT
-	psftel				= eclat(abs(fft(fto_tel, -1)));
-	psf					= eclat(abs(fft(fto_tel * fto_turb, -1)));
+	otf_tel				= telotf(lambdaim, 0.01, extra.teldiam, extra.cobs, lambdaim / extra.teldiam / 4.85 / (float(sim._size) / sim.pupildiam), sim._size) // just for Canary/WHT
+	psftel				= eclat(abs(fft(otf_tel, -1)));
+	psf					= eclat(abs(fft(otf_tel * otf_turb, -1)));
 	
 	
 	if (MC)	{
 		tmp					= exp(-0.5 * dphi_mc) * exp(-0.5 * eclat((*extra.Dphi_ortho)) * fact);
 		tmp(where(mask))	= 0.;
-		fto_mc				= fto_turb * 0.;
-		fto_mc(:sz, :sz)	= eclat(tmp);
-		fto_turb			= eclat(roll(fto_mc, [512 / 2 - sz / 2, 512 / 2 - sz / 2]));
-		psf_mc				= eclat(abs(fft(fto_tel * fto_mc, -1)));
+		otf_mc				= otf_turb * 0.;
+		otf_mc(:sz, :sz)	= eclat(tmp);
+		otf_mc				= eclat(roll(otf_mc, [512 / 2 - sz / 2, 512 / 2 - sz / 2]));
+		psf_mc				= eclat(abs(fft(otf_tel * otf_mc, -1)));
 	}
-		
+	error;
 	
 	/*	PSF from yao	*/
 	imav				= *extra.imav;
@@ -263,7 +263,7 @@ func test_please(MC=)
 	
 	if (MC) {
 		extra.Dphi_ortho	= &(dphi_ortho * atm.dr0at05mic^(5./3));					// only for MC method
-		extra.alias			= &(alias(, +) * alias(, +) / loop.niter);
+		extra.alias			= &(alias(, +) * alias(, +) / extra.niter);
 	}
 	
 	cnn	= 0.;
