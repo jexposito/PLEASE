@@ -4,7 +4,8 @@ struct extra_struct
 	pointer var_ortho;	// Variance of orthogonal modes nomalized at D/r0 = 1
 	pointer cww;		// Covariance matrix of the measurements
 	pointer cMat;		// Command matrix of the system
-	pointer iMat;		// Interaction matrix for an "infinite" basis of modes 
+	pointer iMat;		// Interaction matrix for an "infinite" basis of modes
+	pointer	Dplus		// Pseudo-inverse of iMat D+ = (DtD)-1 Dt
 	pointer modes;		// 3D matrix containing the modes used to do the iMat
 	pointer cbact;		// Circular buffer of the coefficient of the modes
 	pointer ipupil;		// Pupil

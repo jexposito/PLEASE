@@ -14,42 +14,17 @@ func psf_please(cee, extra, MC=)
 	pupil			= *extra.ipupil;
 	Mi				= *extra.modes;
 	nmodes			= dimsof(cee)(2);
+	nact			= extra.nact;
 	lambdaim		= extra.lambdaim;
 	lambdawfs		= extra.lambdawfs;
 	otf				= correlate(pupil, pupil).re;
 	dphi			= pupil * 0.;
 	cMat			= *extra.cMat;
-	
-	//cee	/= extra.normModes;
-	//Mi	/= sqrt(extra.normModes);		// Mi . Mi = extra.normModes
-	
-	/*	Uij	*/
-	/*for (i=1 ; i<=nmodes ; ++i) {
-		for (j=i ; j<=nmodes ; ++j) {
-			
-			write, format="\rComputing U%d%d", i, j;
-			
-			uij	= calc_Uij(Mi(.., i), Mi(.., j), pupil);
-			
-			if (i != j) {
-				dphi	+= (cee(i, j) + cee(j, i)) * uij;
-			} else {
-				dphi	+= cee(i, j) * uij;
-			}
-		}
-	}
-	/*
-	for (i=nm+1 ; i<=nminf ; ++i) {
-		write, format="\rComputing U%d%d", i, i;
+	Dplus			= *extra.Dplus
 		
-		uij		= calc_Uij(Mi(.., i), Mi(.., i), pupil);
-		dphi	+= cee(i, i) * uij;
-	}*/
-	
-	
 	/*	Reconstruction of the structure function of the phase using Vij algorithm	*/
 	/*	Diagonalisation	*/
-	l = SVdec(cee, u, vt, full=1);	// reconstruction: cee = (u(,+) * diag(l)(+,))(,+) * vt(+,)
+	l		= SVdec(cee, u, vt, full=1);	// reconstruction: cee = (u(,+) * diag(l)(+,))(,+) * vt(+,)
 	
 	write, "\nVii computation\n";
 	Mii		= Mi(, , +) * vt(, +);	// diagonalisation
@@ -58,44 +33,46 @@ func psf_please(cee, extra, MC=)
 	/*	Computation of the FFT of the modes	for fast computing */
 	for (i=1 ; i<=nmodes ; i++) {
 		ftmi(, , i)	= fft(Mii(, , i), 1);
-		write, format=" \rComputing FFT of mode %d", i;
+		write, format=" \rComputing FFT of mode #%d", i;
 	}	
 	write, "";
 	
+	conjftpup	= conj(fft(ipupil));
 	/*	Vii computation and structure function computation	*/
 	for (i=1 ; i<=nmodes ; i++) {
 		write, format=" \rComputing V%d%d mode", i;
-		modei	= Mii(..,i);
+		modei	= Mii(.., i);
 		
-		vii		= calc_Viif(ftmi(, , i), ftmi(, , i), modei, modei, otf, conj(fft(ipupil)));
+		vii		= calc_Viif(ftmi(, , i), ftmi(, , i), modei, modei, otf, conjftpup);
 		
 		dphi	+= l(i) * vii;
 	}
 	write, "\n";
 	
 	if (MC) {
-		cee_p	= cMat(, +) * ((*extra.cww)(, +) * cMat(, +))(+, )
+		//cee_p	= cMat(, +) * ((*extra.cww)(, +) * cMat(, +))(+, );
+		cee_p	= Dplus(, +) * ((*extra.cww)(, +) * Dplus(, +))(+, )
 		cee_mc	= cee_p + *extra.alias;
-		l		= SVdec(cee_mc, u, vt, full=1);	// reconstruction: cee = (u(,+) * diag(l)(+,))(,+) * vt(+,)
+		l		= SVdec(cee_mc, u, vt, full=1);			// reconstruction: cee = (u(,+) * diag(l)(+,))(,+) * vt(+,)
 		
 		write, "\nVii computation for MC method\n";
 		Mii		= Mi(, , :extra.nact)(, , +) * vt(,+);	// 
-		ftmi	= complex(Mii * 0.);	//
+		ftmi	= complex(Mii * 0.);					//
 		
 		/*	Computation of the FFT of the modes	for fast computing */
-		for (i=1 ; i<=extra.nact ; i++) {
+		for (i=1 ; i<=nact ; i++) {
 			ftmi(, , i)	= fft(Mii(, , i), 1);
-			write, format=" \rComputing FFT of mode %d", i;
+			write, format=" \rComputing FFT of mode #%d", i;
 		}	
 		write, "";
 		
-		dphi_mc	= dphi * 0.;
 		/*	Vii computation and structure function computation	*/
-		for (i=1 ; i<=extra.nact ; i++) {
+		dphi_mc	= dphi * 0.;
+		for (i=1 ; i<=nact ; i++) {
 			write, format=" \rComputing V%d%d mode for MC method", i;
 			
-			modei	= Mii(..,i);
-			vii		= calc_Viif(ftmi(, , i), ftmi(, , i), modei, modei, otf, conj(fft(ipupil)));
+			modei	= Mii(.., i);
+			vii		= calc_Viif(ftmi(, , i), ftmi(, , i), modei, modei, otf, conjftpup);
 
 			dphi_mc	+= l(i) * vii;
 		}
@@ -103,8 +80,7 @@ func psf_please(cee, extra, MC=)
 	}
 	
 	/*	Reconstruction of the OTF	*/
-
-	fact					= (2 * pi / lambdaim)^2;					// conversion lambda_measurements to lambda_images
+	fact					= (2 * pi / lambdaim)^2;		// conversion µm^2 to rad^2
 	tmp						= exp(-0.5 * dphi * fact);
 	
 	/*	Support definition	*/
@@ -118,22 +94,21 @@ func psf_please(cee, extra, MC=)
 	otf_turb				= eclat(roll(otf_turb, [512 / 2 - sz / 2, 512 / 2 - sz / 2]));
 		
 	/*	Various PSF : Telescope / on sky	*/
-	otf_tel				= telotf(lambdaim, 0.01, extra.teldiam, extra.cobs, lambdaim / extra.teldiam / 4.85 / (float(sim._size) / sim.pupildiam), sim._size) // just for Canary/WHT
+	otf_tel				= telfto(lambdaim, 0.01, extra.teldiam, extra.cobs, lambdaim / extra.teldiam / 4.848 / (float(sim._size) / sim.pupildiam), sim._size) // just for Canary/WHT
 	psftel				= eclat(abs(fft(otf_tel, -1)));
 	psf					= eclat(abs(fft(otf_tel * otf_turb, -1)));
 	
 	
 	if (MC)	{
-		tmp					= exp(-0.5 * dphi_mc) * exp(-0.5 * eclat((*extra.Dphi_ortho)) * fact);
+		tmp					= exp(-0.5 * dphi_mc * fact) * exp(-0.5 * eclat((*extra.Dphi_ortho)) * fact);
 		tmp(where(mask))	= 0.;
 		otf_mc				= otf_turb * 0.;
 		otf_mc(:sz, :sz)	= eclat(tmp);
 		otf_mc				= eclat(roll(otf_mc, [512 / 2 - sz / 2, 512 / 2 - sz / 2]));
 		psf_mc				= eclat(abs(fft(otf_tel * otf_mc, -1)));
 	}
-	error;
-	
-	/*	PSF from yao	*/
+		
+	/*	PSF from Yao	*/
 	imav				= *extra.imav;
 	psftest				= imav / sum(imav);
 	
@@ -145,7 +120,7 @@ func psf_please(cee, extra, MC=)
 	difract				= circavg(psftel, middle=1);
 	
 	/*	Display	*/
-	if (!window_exists(11)) window, 11, dpi=130; // PB after computation : WARNING Gist GdText plotter failed
+	if (!window_exists(11)) window, 11, dpi=130, style="boxed.gs"; // PB after computation : WARNING Gist GdText plotter failed
 	pause, 100;
 	plg,[1]; pause, 100; redraw;
 	fma; limits, , 10;
@@ -156,6 +131,11 @@ func psf_please(cee, extra, MC=)
 	xytitles, "Pixels", "Strehl ratio";
 	pltitle, "PSF circ avg";
 	
+	write, "";
+	write, "Dashed: perfect telescope\n"
+	write, "Red   : Observation";
+	write, "Blue  : MV reconstruction";
+	if (MC) write, "Green : MC reconstruction";
 	error, "test dphi";
 	
 	return psf;
@@ -231,9 +211,10 @@ func test_please(MC=)
 	cee			= act_all(, +) * act_all(, +) / loop.niter;
 	var_ortho	= diag(cee)(nmodes+1:) / atm.dr0at05mic^(5. / 3);
 	
-	/*	normalisation factor so that (Mi . Mi) = 1	*/ // actually not usefull
+	/*	normalisation factor so that (Mi . Mi) = 1	*/
 	m			= mInf(*, )(valid_pix, );
 	normfact	= diag(m(+, ) * m(+, ))(avg);
+	normfact	= sqrt(normfact);
 	
 	if (MC) {
 		dphi_ortho	= fits_read("dphi_ortho_canary.fits") / 2000.; // not normalized by the number of iteration when recorded niter was 2000
@@ -248,6 +229,7 @@ func test_please(MC=)
 	extra.cww			= &(cbmes(, +) * cbmes(, +) / loop.niter);
 	extra.cMat			= &cMat;
 	extra.iMat			= &Dtot;
+	extra.Dplus			= &(LUsolve(iMat(+, ) * iMat(+, ))(, +) * iMat(, +));
 	extra.modes			= &(mInf);
 	extra.cbact			= &act_all;
 	extra.ipupil		= &ipupil;
@@ -272,7 +254,7 @@ func test_please(MC=)
 	write, "Minimization of the criterion";
 	write, "";
 	
-	tmp	= op_mnb(J1J2_diag, get_param(cee, atm.dr0at05mic, extra), fout, gout, extra=extra, verb=5);
+	tmp	= op_mnb(J1J2_diag, get_param(cee, atm.dr0at05mic+0.1, extra), fout, gout, extra=extra, verb=5, xmin=1.e-3);
 	
 	write, "";
 	write, "r0 = ", extra.teldiam / tmp(0);
